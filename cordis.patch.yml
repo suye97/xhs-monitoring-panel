@@ -1,0 +1,3 @@
+- insert:
+    - id: xhs-monitor
+      name: '@local/xhs-monitor'

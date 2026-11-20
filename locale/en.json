@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Xiaohongshu monitor",
+    "description": "Sample Xiaohongshu posts by keyword and track negative sentiment and activity over time. Supports Harness web search, a note data API, and a synthetic demo."
+  }
+}
