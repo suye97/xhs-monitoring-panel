@@ -1,12 +1,13 @@
 # 小红书舆情监控
 
-DeepSeek Harness 侧栏面板。输入关键词，选择数据源，再点「搜索并分析」。面板显示采集笔记数、负面占比、已知互动量、近八次采集记录，以及可按情绪筛选的笔记样本。搜索快照保存于当前浏览器，按关键词和数据源区分。每次最多展示 30 篇去重笔记。
+DeepSeek Harness 侧栏面板。输入关键词，选择数据源，再点「搜索并分析」。面板展示最多 30 篇去重笔记、前 50 条相关评论、过滤统计、情绪与热度趋势。评论正文和作者不会写入浏览器历史；v2 历史仅保存聚合快照。
 
 ## 数据源
 
 - **Harness 网页搜索**通过当前 Harness 配置的网页搜索服务检索网站收录的小红书笔记。分类使用搜索结果提供的标题、摘要，互动数据通常为空。搜索覆盖率取决于供应商索引，服务可能计费。
 - **笔记数据 API**连接你有权使用的结构化笔记服务。可以通过插件配置字段 `searchEndpoint` 或 Host 环境变量 `XHS_MONITOR_SEARCH_URL` 设置完整 HTTPS 地址。接口密钥可通过 Host 环境变量 `XHS_MONITOR_SEARCH_TOKEN` 传入，提供时使用 Bearer 认证。
-- **演示样本**可使用任意关键词，展示八条虚构笔记。演示与实际搜索的快照分别保存。
+- **演示样本**使用「黄金」可离线扫描六篇虚构笔记中的 120 条评论；其他关键词展示原有八篇演示笔记。
+- **小红书直连**默认关闭，仅当管理员设置 `XHS_MONITOR_DIRECT=1` 并通过 `XHS_MONITOR_COOKIE` 提供有效登录态时可用。签名使用固定版本的 MIT 依赖 `xhshow-js`。不使用代理池、账号池或验证码绕过。遇登录验证立即停止。
 
 ### 笔记数据 API 约定
 
@@ -25,6 +26,25 @@ DeepSeek Harness 侧栏面板。输入关键词，选择数据源，再点「搜
   ]
 }
 ```
+
+## 评论扫描与网关契约
+
+`searchEndpoint` 或环境变量 `XHS_MONITOR_SEARCH_URL` 指向有权使用的 HTTPS 网关。可用 `commentsEndpoint` 或 `XHS_MONITOR_COMMENTS_URL` 单独设置评论地址；未设置时沿用搜索地址。开启评论扫描时，插件发送 `GET`，查询参数为 `note_id`、`cursor` 和 `limit=20`。响应须包含 `comments` 数组、`cursor` 字符串和 `has_more` 布尔值。每条评论至少包含 `id`、`text`，可选非负整数 `likes`。
+
+```json
+{
+  "comments": [{ "id": "1234567890", "text": "今天金价和工费都涨了", "likes": 3 }],
+  "cursor": "next-page-token",
+  "has_more": true
+}
+```
+
+`POST /api/xhs-monitor.search` 接受 `keyword`、`source`、`includeComments`、`commentLimit`（1–50）和 `scanNotes`（1–10）。`GET /api/xhs-monitor.meta` 返回数据源能力。`comments` 包含状态、扫描数量、过滤原因及按相关度排列的评论。网页搜索没有评论分页能力，返回 `unsupported`；单篇评论失败时返回 `partial`。
+
+默认扫描相关度最高的六篇笔记，每篇最多三页或 60 条原始评论，总上限 600 条，并发二、请求频率最高每秒 1.5 次。前 50 条先按每篇最多 15 条分配，不足时从剩余评论补齐。`truncated` 表示扫描或返回达到上限。联系方式、营销引导、重复、纯表情、低信息与跑题评论会过滤。规则相关度需要人工抽检。
+
+可通过 `XHS_MONITOR_QPS`（0.5–1.5）和 `XHS_MONITOR_SCAN_NOTES`（1–10）调整默认限制。直连 Cookie 仅从环境变量读取，不写入浏览器历史或服务端日志。直连接口和签名可能随平台变化；上线前应确认平台条款与使用权限。候选项目和许可证见[开源调研](docs/xhs-oss-research.md)。
+
 
 ## 统计口径
 

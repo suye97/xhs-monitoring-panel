@@ -9,14 +9,43 @@
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
-  "files": ["index.js", "monitor.js", "client.js", "cordis.patch.yml", "locale/*.json", "icon.svg", "README.md"],
-  "scripts": { "test": "node --test" },
+  "files": [
+    "index.js",
+    "monitor.js",
+    "sentiment.js",
+    "text.js",
+    "relevance.js",
+    "filters.js",
+    "comments.js",
+    "normalize.js",
+    "sources.js",
+    "direct.js",
+    "fixtures/gold.json",
+    "docs/xhs-oss-research.md",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-locale", "@deepseek-ai/dsh-client-ui-layout", "@deepseek-ai/dsh-client-ui-sidebar"]
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
     }
+  },
+  "dependencies": {
+    "xhshow-js": "1.0.0"
   }
 }

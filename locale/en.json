@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Xiaohongshu monitor",
-    "description": "Sample Xiaohongshu posts by keyword and track negative sentiment and activity over time. Supports Harness web search, a note data API, and a synthetic demo."
+    "description": "Search Xiaohongshu posts by keyword, scan relevant comments, and track sentiment. Supports web search, a configured gateway, demo data, and explicitly enabled direct access."
   }
 }
