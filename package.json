@@ -1,6 +1,6 @@
 {
   "name": "@local/xhs-monitor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "exports": {
@@ -9,28 +9,9 @@
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
-  "files": [
-    "index.js",
-    "monitor.js",
-    "sentiment.js",
-    "text.js",
-    "relevance.js",
-    "filters.js",
-    "comments.js",
-    "normalize.js",
-    "sources.js",
-    "direct.js",
-    "fixtures/gold.json",
-    "docs/xhs-oss-research.md",
-    "client.js",
-    "cordis.patch.yml",
-    "locale/*.json",
-    "icon.svg",
-    "README.md"
-  ],
-  "scripts": {
-    "test": "node --test"
-  },
+  "files": ["index.js", "monitor.js", "opencli.js", "opencli-detail.js", "analysis.js", "history.js", "sentiment.js", "text.js", "relevance.js", "filters.js", "normalize.js", "fixtures/gold.json", "docs/xhs-oss-research.md", "client.js", "cordis.patch.yml", "locale/*.json", "icon.svg", "README.md"],
+  "dependencies": { "@jackwener/opencli": "2.0.3" },
+  "scripts": { "test": "node --test" },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
@@ -44,8 +25,5 @@
         "@deepseek-ai/dsh-client-ui-sidebar"
       ]
     }
-  },
-  "dependencies": {
-    "xhshow-js": "1.0.0"
   }
 }

@@ -1,9 +1,9 @@
 import { cleanText } from './text.js';
 
-const NOTE_PATH = /^\/(?:explore|discovery\/item)\/([a-f\d]{24})\/?$/i;
+const NOTE_PATH = /^\/(?:explore|discovery\/item|search_result)\/([a-f\d]{24})\/?$/i;
 
 // 校验笔记地址并限制可返回的字段。
-export function normalizeNotes(rows, classify, limit = 30) {
+export function normalizeNotes(rows, classify, limit = 30, preserveToken = false) {
   const notes = new Map();
   for (const row of rows) {
     if (typeof row?.url !== 'string' || row.url.length > 2048) continue;
@@ -14,7 +14,9 @@ export function normalizeNotes(rows, classify, limit = 30) {
     if (!match) continue;
     const id = match[1].toLowerCase();
     url.hash = '';
+    const token = preserveToken ? url.searchParams.get('xsec_token') : null;
     url.search = '';
+    if (token) url.searchParams.set('xsec_token', token);
     const title = cleanText(row.title, 180);
     const text = cleanText(row.text || row.snippet || row.summary, 1000);
     const metrics = {};

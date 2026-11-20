@@ -1,62 +1,32 @@
 # 小红书舆情监控
 
-DeepSeek Harness 侧栏面板。输入关键词，选择数据源，再点「搜索并分析」。面板展示最多 30 篇去重笔记、前 50 条相关评论、过滤统计、情绪与热度趋势。评论正文和作者不会写入浏览器历史；v2 历史仅保存聚合快照。
+仅通过固定版本的 [OpenCLI 2.0.3](https://github.com/jackwener/OpenCLI) Browser Bridge 采集已登录浏览器可见的笔记和评论。输入关键词后，按综合排序搜索，按笔记 ID 去重，每轮最多处理 6 篇。每篇在同一个详情页读取正文、互动数与有界评论候选，过滤广告、重复和跑题内容后按相关度保留最多 50 条一级评论及回复。
 
-## 数据源
+## 使用
 
-- **Harness 网页搜索**通过当前 Harness 配置的网页搜索服务检索网站收录的小红书笔记。分类使用搜索结果提供的标题、摘要，互动数据通常为空。搜索覆盖率取决于供应商索引，服务可能计费。
-- **笔记数据 API**连接你有权使用的结构化笔记服务。可以通过插件配置字段 `searchEndpoint` 或 Host 环境变量 `XHS_MONITOR_SEARCH_URL` 设置完整 HTTPS 地址。接口密钥可通过 Host 环境变量 `XHS_MONITOR_SEARCH_TOKEN` 传入，提供时使用 Bearer 认证。
-- **演示样本**使用「黄金」可离线扫描六篇虚构笔记中的 120 条评论；其他关键词展示原有八篇演示笔记。
-- **小红书直连**默认关闭，仅当管理员设置 `XHS_MONITOR_DIRECT=1` 并通过 `XHS_MONITOR_COOKIE` 提供有效登录态时可用。签名使用固定版本的 MIT 依赖 `xhshow-js`。不使用代理池、账号池或验证码绕过。遇登录验证立即停止。
+1. 在本目录执行 `npm ci --ignore-scripts`。需要 Node.js 20.18.1 或更新版本。
+2. 安装并启用 [OpenCLI Browser Bridge](https://github.com/jackwener/OpenCLI/blob/main/docs/guide/browser-bridge.md)，在同一浏览器登录小红书。保持浏览器可见。
+3. 打开侧栏「小红书舆情监控」，输入关键词，例如「黄金」，点击「搜索笔记并扫描评论」。
+4. 点击任意采集历史条目可查看当次正文、评论、扫描覆盖、AI 总结和情绪指数。页面刷新或宿主重启后仍可查看。旧版浏览器历史仅显示原有汇总快照。
 
-### 笔记数据 API 约定
+OpenCLI 未安装在插件依赖位置时，可用 `XHS_MONITOR_OPENCLI_ENTRY` 指向其 JavaScript 入口绝对路径；`XHS_MONITOR_NODE_EXECUTABLE` 可指定 Node 可执行文件。详情适配器使用插件所安装的 2.0.3 版本。
 
-插件向配置地址发送 `GET` 请求，查询参数包括 `keyword` 和 `limit=30`。响应为 JSON 对象，其中 `posts` 为笔记数组，可选 `truncated: true` 标记上游截断。`url` 必须是 HTTPS 小红书笔记链接。`title`、`text`、`likes`、`comments`、`saves`、`shares` 为可选字段，互动字段接受非负整数。已有服务若返回不同结构，可在其数据网关转换后接入。
+## AI 分析
 
-```json
-{
-  "posts": [
-    {
-      "url": "https://www.xiaohongshu.com/explore/0123456789abcdef01234567",
-      "title": "试用两周的感受",
-      "text": "有异味，已经申请退款。",
-      "likes": 12,
-      "comments": 3
-    }
-  ]
-}
-```
+通过插件配置 `analysisEndpoint`、`analysisModel`、`analysisToken`，或环境变量 `XHS_MONITOR_ANALYSIS_URL`、`XHS_MONITOR_ANALYSIS_MODEL`、`XHS_MONITOR_ANALYSIS_TOKEN` 设置兼容 Chat Completions 的模型服务。地址必须是 HTTPS，或本机 `localhost` / `127.0.0.1`。未配置时采集仍保存，分析状态为 `unconfigured`，在历史详情中配置完成后可点「重试分析」。模型服务失败或返回不完整 JSON 时保留采集结果及失败状态，重试不会重新采集。
 
-## 评论扫描与网关契约
+模型逐篇独立判断笔记和每条评论的 AI 生成概率及情绪；概率达到 0.85 的笔记只从笔记指数剔除，评论仍逐条独立判断。指数为 `100 × (正向数 − 负向数) ÷ 有效样本数`，分别统计笔记与评论，并显示分母和剔除数量。无有效样本时指数为空。AI 生成判断只是估计，短文本可能不确定。
 
-`searchEndpoint` 或环境变量 `XHS_MONITOR_SEARCH_URL` 指向有权使用的 HTTPS 网关。可用 `commentsEndpoint` 或 `XHS_MONITOR_COMMENTS_URL` 单独设置评论地址；未设置时沿用搜索地址。开启评论扫描时，插件发送 `GET`，查询参数为 `note_id`、`cursor` 和 `limit=20`。响应须包含 `comments` 数组、`cursor` 字符串和 `has_more` 布尔值。每条评论至少包含 `id`、`text`，可选非负整数 `likes`。
+## 任务与接口
 
-```json
-{
-  "comments": [{ "id": "1234567890", "text": "今天金价和工费都涨了", "likes": 3 }],
-  "cursor": "next-page-token",
-  "has_more": true
-}
-```
+采集结果按雪花任务 ID 保存为独立 JSON 文件。默认目录是宿主工作目录下的 `.xhs-monitor-data`，可用插件 `dataDir` 或 `XHS_MONITOR_DATA_DIR` 指定。保存采用同目录临时文件和重命名。无数据库表结构变化。
 
-`POST /api/xhs-monitor.search` 接受 `keyword`、`source`、`includeComments`、`commentLimit`（1–50）和 `scanNotes`（1–10）。`GET /api/xhs-monitor.meta` 返回数据源能力。`comments` 包含状态、扫描数量、过滤原因及按相关度排列的评论。网页搜索没有评论分页能力，返回 `unsupported`；单篇评论失败时返回 `partial`。
+- `POST /api/xhs-monitor.search`：`{"keyword":"黄金","requestKey":"可选雪花幂等键"}`。同关键词在途请求共用一轮任务；新键在上一轮结束后启动新采集。
+- `GET /api/xhs-monitor.history`：最近 80 次采集的列表。
+- `GET /api/xhs-monitor.detail?taskId=...`：当次完整结果。
+- `POST /api/xhs-monitor.analysis-retry`：`{"taskId":"..."}`，只重试模型分析。
+- 工具 `xhs_monitor_search` 使用同一入口，仅提供关键词和可选幂等键。
 
-默认扫描相关度最高的六篇笔记，每篇最多三页或 60 条原始评论，总上限 600 条，并发二、请求频率最高每秒 1.5 次。前 50 条先按每篇最多 15 条分配，不足时从剩余评论补齐。`truncated` 表示扫描或返回达到上限。联系方式、营销引导、重复、纯表情、低信息与跑题评论会过滤。规则相关度需要人工抽检。
+扫描覆盖与截断原因随每篇保存。平台登录失效、限制访问、Bridge 断开、评论未加载以及评论不足 50 条均可能使结果不完整。离线的 `fixtures/gold.json` 仅用于核对主题相关性和过滤规则；真实「黄金」采集需要已登录且连接 Bridge 的浏览器环境。
 
-可通过 `XHS_MONITOR_QPS`（0.5–1.5）和 `XHS_MONITOR_SCAN_NOTES`（1–10）调整默认限制。直连 Cookie 仅从环境变量读取，不写入浏览器历史或服务端日志。直连接口和签名可能随平台变化；上线前应确认平台条款与使用权限。候选项目和许可证见[开源调研](docs/xhs-oss-research.md)。
-
-
-## 统计口径
-
-- **负面占比**为负面笔记数除以存在标题或文本的笔记数。混合和中性计入分母，无文本样本单独显示。分类使用中文词语规则，命中词可在帖子列表中查看，反讽、隐晦表达和语境可能导致误判。
-- **已知互动量**是采集样本中已知的赞、评、藏和分享总和，并附带覆盖篇数。按钮触发的新搜索建立一条快照。用户可在首次搜索成功后启用每 30 分钟刷新，面板打开且可见时运行。记录反映返回样本及当次累计互动量，适合观察采集趋势。
-
-## 安装
-
-通过 Harness「插件 → 添加插件」选择此目录。安装后从左侧栏打开「小红书舆情监控」。
-
-插件还注册了 `xhs_monitor_search` 工具。它复用面板的搜索和统计逻辑，并最多返回十条笔记摘要索引。面板快照保存在使用面板的浏览器中。
-
-```powershell
-npm test
-```
+开源项目能力对比见 [调研记录](docs/xhs-oss-research.md)。
