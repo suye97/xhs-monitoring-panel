@@ -1,5 +1,5 @@
 const LIMIT = 30;
-const NOTE_PATH = /^\/(?:explore|discovery\/item)\/([a-f\d]{24})\/?$/i;
+const NOTE_PATH = /^\/(?:explore|discovery\/item|search_result)\/([a-f\d]{24})\/?$/i;
 const NEGATIVE = /避雷|踩雷|差评|失望|退款|退货|翻车|糟糕|难用|难喝|难吃|太贵|被骗|欺骗|虚假宣传|过敏|质量差|服务差|异味|漏液|不推荐|不满意|不值得|不(?:太)?(?:喜欢|好用|好喝|好吃|会回购)|后悔|投诉|故障|崩溃/g;
 const POSITIVE = /满意|推荐|喜欢|惊喜|好用|好喝|好吃|值得|回购|好评|性价比高|物超所值|支持|不错|很棒/g;
 
@@ -103,11 +103,35 @@ const DEMO = [
   ['', '', 25, 5],
 ];
 
-export function createMonitor({ web, endpoint, token, request = fetch, now = () => new Date() }) {
+function analyzeCommentScans(notes) {
+  const sampled = notes.filter(note => note.commentScan?.status === 'sampled');
+  const counts = { negative: 0, positive: 0, neutral: 0, mixed: 0 };
+  for (const note of sampled) {
+    note.commentScan.items = note.commentScan.items.map(item => {
+      const classification = classify('', item.text);
+      counts[classification.sentiment]++;
+      return { ...item, ...classification };
+    });
+  }
+  const count = Object.values(counts).reduce((total, value) => total + value, 0);
+  return { count, counts, sampledNotes: sampled.length,
+    failedNotes: notes.filter(note => note.commentScan?.status === 'failed').length,
+    skippedNotes: notes.filter(note => note.commentScan?.status === 'skipped').length,
+    negativeRatio: count ? counts.negative / count : null };
+}
+
+export function createMonitor({ web, endpoint, token, collector, request = fetch, now = () => new Date() }) {
   return async function search(input, parentSignal) {
     const keyword = typeof input?.keyword === 'string' ? input.keyword.trim().normalize('NFKC') : '';
     const source = input?.source ?? 'web';
     if (!keyword || keyword.length > 80 || /[\p{Cc}]/u.test(keyword)) throw new MonitorError('invalidKeyword', 400);
+    if (source === 'opencli') {
+      if (!collector) throw new MonitorError('collectorUnavailable', 503);
+      const { notes, limited } = await collector(keyword, parentSignal);
+      for (const note of notes) Object.assign(note, classify(note.title, note.text));
+      const comments = analyzeCommentScans(notes);
+      return { keyword, source, capturedAt: now().toISOString(), limited, stats: summarize(notes), comments, notes };
+    }
     const deadline = AbortSignal.timeout(25_000);
     const signal = parentSignal ? AbortSignal.any([parentSignal, deadline]) : deadline;
     signal.throwIfAborted();

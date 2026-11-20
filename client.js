@@ -5,9 +5,10 @@ window.__ModuleLoader__.load({
     const { createElement: h, useEffect, useRef, useState } = React;
     const id = 'xhs-monitor';
     const storageKey = '@local/xhs-monitor/history-v1';
-    const sources = ['web', 'api', 'demo'];
+    const sources = ['opencli', 'web', 'api', 'demo'];
     const sentiments = ['negative', 'positive', 'neutral', 'mixed', 'unknown'];
-    const errors = ['invalidKeyword', 'webUnavailable', 'apiUnavailable', 'apiConfiguration', 'apiFailed', 'apiFormat', 'rateLimited', 'timeout', 'searchFailed'];
+    const errors = ['invalidKeyword', 'webUnavailable', 'apiUnavailable', 'apiConfiguration', 'apiFailed', 'apiFormat', 'rateLimited', 'timeout', 'searchFailed',
+      'collectorUnavailable', 'collectorBridge', 'collectorLogin', 'collectorBlocked', 'collectorBusy', 'collectorFailed', 'collectorFormat'];
     const zh = {
       title: '小红书舆情监控', intro: '按关键词采集笔记样本，追踪情绪和热度变化。',
       keyword: '关键词', placeholder: '输入品牌、产品或话题', source: '数据源', web: 'Harness 网页搜索', api: '笔记数据 API', demo: '演示样本',
@@ -52,6 +53,36 @@ window.__ModuleLoader__.load({
       apiConfiguration: 'The note API requires a valid HTTPS URL.', apiFailed: 'The note API request failed. Check the endpoint and credentials.',
       apiFormat: 'The note API did not return the expected response.', rateLimited: 'The provider throttled the request. Try again later.', timeout: 'The search timed out. Try again.',
     };
+    Object.assign(zh, {
+      opencli: 'OpenCLI 笔记与评论', opencliInfo: '使用已登录小红书且连接 Browser Bridge 的浏览器。每次最多扫描 6 篇笔记，每篇最多 20 条文本评论及回复（合计）。',
+      collectorUnavailable: 'Harness Host 找不到 OpenCLI。请安装插件依赖，或配置 XHS_MONITOR_OPENCLI_ENTRY。',
+      collectorBridge: 'OpenCLI 浏览器桥接未连接。请打开装有 Browser Bridge 的浏览器并启用该扩展。',
+      collectorLogin: '请在已连接的浏览器中登录小红书，再重试。',
+      collectorBlocked: '平台限制了本次采集，扫描已停止。', collectorBusy: '已有一项 OpenCLI 采集在运行。',
+      collectorFailed: 'OpenCLI 采集失败，请检查浏览器连接和登录状态。', collectorFormat: 'OpenCLI 返回了无法识别的数据。',
+      collectorNoteLink: '搜索结果缺少读取这篇笔记所需的链接参数。', detailUnavailable: '笔记详情读取失败，情绪分析使用搜索标题。',
+      commentRatio: '评论负面占比', commentSample: '已采集文本评论', commentCoverage: '评论扫描成功的笔记',
+      commentScope: '评论占比按采到的文本评论和回复计算。每次扫描只反映本次样本。',
+      commentFailed: '读取失败', commentSkipped: '跳过', commentEmpty: '本次没有采到文本评论。',
+      commentLimited: '本次可能还有更多评论。', commentReply: '回复',
+      scanAction: '搜索笔记并扫描评论', scanCanceled: '已取消采集。', previousCapture: '以下保留上一次采集结果。',
+      scanComplete: '采集结束', retry: '重试',
+    });
+    Object.assign(en, {
+      opencli: 'OpenCLI notes and comments', opencliInfo: 'Uses a Browser Bridge connection to a signed-in browser. Samples up to 6 notes and 20 text comments and replies combined per note.',
+      collectorUnavailable: 'Harness Host could not find OpenCLI. Install the plugin dependencies or set XHS_MONITOR_OPENCLI_ENTRY.',
+      collectorBridge: 'OpenCLI Browser Bridge is disconnected. Open the browser and enable the Browser Bridge extension.',
+      collectorLogin: 'Sign into Xiaohongshu in the connected browser and try again.',
+      collectorBlocked: 'Xiaohongshu restricted this capture. The scan stopped.', collectorBusy: 'An OpenCLI capture is already running.',
+      collectorFailed: 'OpenCLI capture failed. Check the browser connection and sign-in.', collectorFormat: 'OpenCLI returned an unrecognized result.',
+      collectorNoteLink: 'The search result is missing a link parameter required to open this note.', detailUnavailable: 'Note details are unavailable. Sentiment uses the search title.',
+      commentRatio: 'Negative comment share', commentSample: 'Text comments sampled', commentCoverage: 'Notes scanned successfully',
+      commentScope: 'Comment share uses the text comments and replies collected in this sample.',
+      commentFailed: 'Reads failed', commentSkipped: 'Skipped', commentEmpty: 'No text comments were collected.',
+      commentLimited: 'More comments may be available.', commentReply: 'Reply',
+      scanAction: 'Search notes and scan comments', scanCanceled: 'Capture canceled.', previousCapture: 'Showing the previous capture.',
+      scanComplete: 'Capture finished', retry: 'Retry',
+    });
     const styles = `
       .xhs-page{height:100%;min-height:0;overflow:auto;color:var(--dsw-alias-label-primary);background:var(--dsw-alias-bg-base);font-size:14px;line-height:1.55}
       .xhs-content{max-width:960px;margin:auto;padding:28px clamp(16px,4vw,48px) 48px}
@@ -84,6 +115,10 @@ window.__ModuleLoader__.load({
       .xhs-post{display:grid;gap:5px;border-bottom:1px solid var(--dsw-alias-border-l3);padding:5px 0 11px;min-width:0}
       .xhs-page a{color:inherit;text-underline-offset:3px}
       .xhs-post p{overflow-wrap:anywhere;white-space:pre-wrap}
+      .xhs-comment-scan{padding:8px 0}
+      .xhs-comment-scan summary{cursor:pointer}
+      .xhs-comment-scan ol{display:grid;gap:6px;padding-inline-start:1.5em;margin-block:8px 0}
+      .xhs-comment-scan small{color:var(--dsw-alias-label-secondary)}
       .xhs-pill{width:max-content;border:1px solid var(--dsw-alias-border-l3);border-radius:999px;padding:1px 8px;font-size:12px}
       .xhs-negative{font-weight:700}
       .xhs-trend{overflow-x:auto}
@@ -131,12 +166,28 @@ window.__ModuleLoader__.load({
             h('td', null, formatRatio(row.negativeRatio)), h('td', null, formatNumber(row.interactions))))))));
     }
 
+    function CommentScan({ scan, t, formatNumber }) {
+      if (!scan) return null;
+      if (scan.status !== 'sampled') {
+        const reason = [...errors, 'collectorNoteLink'].includes(scan.reason) ? scan.reason : 'collectorFailed';
+        return h('p', { className: 'xhs-muted' }, `${t(scan.status === 'failed' ? 'commentFailed' : 'commentSkipped')} · ${t(reason)}`);
+      }
+      const limitHint = scan.limited ? ` · ${t('commentLimited')}` : '';
+      if (!scan.items.length) return h('p', { className: 'xhs-muted' }, `${t('commentEmpty')}${limitHint}`);
+      return h('details', { className: 'xhs-comment-scan' },
+        h('summary', null, `${t('commentSample')} (${formatNumber(scan.items.length)})${limitHint}`),
+
+        h('ol', null, scan.items.map((item, index) => h('li', { key: index },
+          h('p', null, item.text), h('small', null, item.isReply ? `${t('commentReply')} · ${t(item.sentiment)}` : t(item.sentiment))))));
+    }
+
     function Panel({ t }) {
       const [history, setHistory] = useState(readHistory);
       const [keyword, setKeyword] = useState(history[0]?.keyword ?? '');
-      const [source, setSource] = useState(history[0]?.source ?? 'web');
+      const [source, setSource] = useState(history[0]?.source ?? 'opencli');
       const [result, setResult] = useState(null);
       const [error, setError] = useState('');
+      const [canceled, setCanceled] = useState(false);
       const [storageFailed, setStorageFailed] = useState(false);
       const [pending, setPending] = useState(false);
       const [auto, setAuto] = useState(false);
@@ -156,6 +207,7 @@ window.__ModuleLoader__.load({
         live.current = controller;
         setPending(true);
         setError('');
+        setCanceled(false);
         try {
           const send = window.__DSH_TRANSPORT__?.fetch ?? ((path, init) => fetch(path, init));
           const response = await send('api/xhs-monitor.search', { method: 'POST', signal: controller.signal,
@@ -201,6 +253,7 @@ window.__ModuleLoader__.load({
       const displayed = result && signature(result) === signature({ keyword: keyword.trim().normalize('NFKC'), source }) ? result : null;
       const trend = history.filter(row => signature(row) === signature({ keyword: keyword.trim().normalize('NFKC'), source })).slice(0, 8);
       const stats = displayed?.stats;
+      const commentStats = displayed?.comments;
       const notes = displayed?.notes.filter(note => filter === 'all' || filter === note.sentiment) ?? [];
 
       return h('div', { className: 'xhs-page' }, h('style', null, styles), h('div', { className: 'xhs-content' },
@@ -212,17 +265,21 @@ window.__ModuleLoader__.load({
             h('fieldset', { className: 'xhs-field xhs-sources', disabled: pending }, h('legend', null, t('source')),
               h('div', null, sources.map(key => h('button', { key, type: 'button', 'aria-pressed': source === key,
                 onClick: () => { if (source !== key) { setAuto(false); setError(''); setSource(key); } } }, t(key))))),
-            h('button', { className: 'xhs-submit', type: 'submit', disabled: pending || !keyword.trim() }, t('search')),
-            pending && h('button', { type: 'button', onClick: () => { setAuto(false); live.current?.abort(); } }, t('cancel'))),
+            h('button', { className: 'xhs-submit', type: 'submit', disabled: pending || !keyword.trim() }, t(source === 'opencli' ? 'scanAction' : 'search')),
+            pending && h('button', { type: 'button', onClick: () => { setAuto(false); setCanceled(true); live.current?.abort(); } }, t('cancel'))),
           h('div', { className: 'xhs-row' }, h('p', { className: 'xhs-muted' }, t(`${source}Info`)),
             displayed && source !== 'demo' && h('label', { className: 'xhs-auto' }, h('input', { type: 'checkbox', checked: auto,
               onChange: event => setAuto(event.target.checked) }), t('auto'))),
           recent.length > 0 && h('div', { className: 'xhs-history', 'aria-label': t('history') }, recent.map(row =>
             h('button', { key: signature(row), type: 'button', disabled: pending, onClick: () => { setAuto(false); setError(''); setKeyword(row.keyword); setSource(row.source); } },
               `${row.keyword} · ${t(row.source)}`))),
-          h('div', { className: 'xhs-muted xhs-status', role: 'status' }, pending ? t('busy') : auto ? t('autoActive') : ''),
-          error && h('p', { role: 'alert' }, t(error)), storageFailed && h('p', { className: 'xhs-muted' }, t('storageFailed'))),
+          h('div', { className: 'xhs-muted xhs-status', role: 'status' }, pending ? t('busy') : canceled ? t('scanCanceled') : auto ? t('autoActive') :
+            !error && commentStats ? `${t('scanComplete')} · ${t('sample')} ${formatNumber(stats.count)} · ${t('commentSample')} ${formatNumber(commentStats.count)}` : ''),
+          error && h('div', { className: 'xhs-row' }, h('p', { role: 'alert' }, t(error)),
+            source === 'opencli' && h('button', { type: 'button', disabled: pending, onClick: () => void run(keyword, source) }, t('retry'))),
+          storageFailed && h('p', { className: 'xhs-muted' }, t('storageFailed'))),
         stats && h('section', { className: 'xhs-section' },
+           (error || canceled) && h('p', { className: 'xhs-muted' }, t('previousCapture')),
           h('div', { className: 'xhs-row' }, h('h2', null, displayed.keyword), h('p', { className: 'xhs-muted' },
             `${t(displayed.source)} · ${t('sampled')} ${formatDate(displayed.capturedAt)}`)),
           h('dl', { className: 'xhs-metrics' }, [
@@ -232,6 +289,12 @@ window.__ModuleLoader__.load({
           ].map(([key, value, explanation]) => h('div', { className: 'xhs-card', key }, h('dt', null, t(key)), h('dd', null, value),
             h('p', { className: 'xhs-muted' }, explanation)))),
           h('p', { className: 'xhs-muted' }, `${t('method')} ${t('scope')}`),
+          commentStats && h('dl', { className: 'xhs-metrics' },
+            h('div', { className: 'xhs-card' }, h('dt', null, t('commentRatio')), h('dd', null, formatRatio(commentStats.negativeRatio)),
+              h('p', { className: 'xhs-muted' }, `${t('negative')} ${formatNumber(commentStats.counts.negative)} / ${formatNumber(commentStats.count)}`)),
+            h('div', { className: 'xhs-card' }, h('dt', null, t('commentCoverage')), h('dd', null, `${formatNumber(commentStats.sampledNotes)} / ${formatNumber(stats.count)}`),
+              h('p', { className: 'xhs-muted' }, `${t('commentFailed')} ${formatNumber(commentStats.failedNotes)} · ${t('commentSkipped')} ${formatNumber(commentStats.skippedNotes)}`))),
+          commentStats && h('p', { className: 'xhs-muted' }, t('commentScope')),
           displayed.limited && h('p', { className: 'xhs-muted' }, t('codeLimit')),
           !stats.count && h('p', { role: 'status' }, t('noResults'))),
         trend.length > 0 && h(Trend, { rows: trend, t, formatNumber, formatRatio, formatDate }),
@@ -246,7 +309,9 @@ window.__ModuleLoader__.load({
             note.text && h('p', null, note.text),
             note.signals.length > 0 && h('p', { className: 'xhs-muted' }, `${t('signals')} · ${note.signals.join('、')}`),
             Object.keys(note.metrics).length > 0 && h('p', { className: 'xhs-muted' }, Object.entries(note.metrics)
-              .map(([name, value]) => `${t(name)} ${formatNumber(value)}`).join(' · '))))) : h('p', { role: 'status' }, t('emptyFilter')))));
+              .map(([name, value]) => `${t(name)} ${formatNumber(value)}`).join(' · ')),
+            note.detailError && h('p', { className: 'xhs-muted' }, t('detailUnavailable')),
+            h(CommentScan, { scan: note.commentScan, t, formatNumber })))) : h('p', { role: 'status' }, t('emptyFilter')))));
     }
 
     return {
