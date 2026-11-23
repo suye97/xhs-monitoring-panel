@@ -1,3 +1,2 @@
-- insert:
-    - id: xhs-monitor
-      name: '@local/xhs-monitor'
+# No host plugin patch is used by the standalone Electron application.
+{}

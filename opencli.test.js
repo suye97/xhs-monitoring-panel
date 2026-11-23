@@ -2,21 +2,17 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
-import { createOpenCliCollector, createOpenCliRunner } from './opencli.js';
-import { createMonitor, handleSearch, MonitorError } from './monitor.js';
+import { it } from 'vitest';
+import { createOpenCliCollector, createOpenCliRunner } from './src/main/opencli.ts';
+import { createMonitor, MonitorError } from './src/main/monitor.ts';
 
 const first = 'https://www.xiaohongshu.com/search_result/0123456789abcdef01234567?xsec_token=a&xsec_source=pc_search';
 const second = 'https://www.xiaohongshu.com/explore/aaaaaaaaaaaaaaaaaaaaaaaa?xsec_token=b';
 const third = 'https://www.xiaohongshu.com/explore/bbbbbbbbbbbbbbbbbbbbbbbb?xsec_token=c';
 
-const request = keyword => new Request('https://localhost/api/xhs-monitor.search', {
-  method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keyword, source: 'opencli' }),
-});
-
-test('uses OpenCLI envelopes and keeps keyword input in a single positional argument', async t => {
+it('uses OpenCLI envelopes and keeps keyword input in a single positional argument', async context => {
   const dir = await mkdtemp(join(tmpdir(), 'xhs-monitor-test-'));
-  t.after(() => rm(dir, { recursive: true, force: true }));
+  context.onTestFinished(() => rm(dir, { recursive: true, force: true }));
   const fixture = join(dir, 'fixture.cjs');
   await writeFile(fixture, `const args = process.argv.slice(2);
 if (args.at(-1) === 'disconnect') {
@@ -31,7 +27,7 @@ if (args.at(-1) === 'disconnect') {
   await assert.rejects(run('search', [], 'disconnect'), { code: 'collectorBridge' });
 });
 
-test('keeps a successful comment sample when another note is blocked and later notes are skipped', async () => {
+it('keeps a successful comment sample when another note is blocked and later notes are skipped', async () => {
   const calls = [];
   const collector = createOpenCliCollector(async (verb, options, value) => {
     calls.push([verb, value]);
@@ -41,9 +37,7 @@ test('keeps a successful comment sample when another note is blocked and later n
     if (value === first) return [{ text: '踩雷' }, { text: '喜欢', is_reply: true }, { text: ' ' }];
     throw new MonitorError('collectorBlocked');
   });
-  const response = await handleSearch(request('咖啡'), createMonitor({ collector }));
-  assert.equal(response.status, 200);
-  const result = await response.json();
+  const result = await createMonitor({ collector })({ keyword: '咖啡', source: 'opencli' });
   assert.deepEqual(calls.map(([verb]) => verb), ['search', 'comments', 'note', 'comments']);
   assert.equal(result.stats.count, 3);
   assert.equal(result.stats.negativeRatio, 0);
@@ -55,7 +49,7 @@ test('keeps a successful comment sample when another note is blocked and later n
     counts: { negative: 1, positive: 1, neutral: 0, mixed: 0 }, negativeRatio: 0.5 });
 });
 
-test('distinguishes successful empty comments and link skips from a measured zero percent', async () => {
+it('distinguishes successful empty comments and link skips from a measured zero percent', async () => {
   const collect = createOpenCliCollector(async verb => verb === 'search' ? [{ url: first }, { url: second.split('?')[0] }] : []);
   const result = await createMonitor({ collector: collect })({ keyword: '茶', source: 'opencli' });
   assert.equal(result.comments.negativeRatio, null);
@@ -63,7 +57,7 @@ test('distinguishes successful empty comments and link skips from a measured zer
   assert.equal(result.notes[1].commentScan.reason, 'collectorNoteLink');
 });
 
-test('cancels an active scan and prevents another request from sharing its browser session', async () => {
+it('cancels an active scan and prevents another request from sharing its browser session', async () => {
   const collect = createOpenCliCollector(async (_verb, _options, _value, signal) => {
     await new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }));
   });
