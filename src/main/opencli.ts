@@ -8,6 +8,9 @@ import { MonitorError, normalizeNotes, type Collector } from './monitor';
 
 const require = createRequire(import.meta.url);
 const execute = promisify(execFile);
+const moduleDirectory = fileURLToPath(new URL('.', import.meta.url));
+// A child process needs a physical working directory outside the ASAR archive.
+const childWorkingDirectory = /[\\/]app\.asar[\\/]/.test(moduleDirectory) ? process.resourcesPath : moduleDirectory;
 const NOTE_LIMIT = 6;
 const TOP_LIMIT = 10;
 const COMMENT_LIMIT = 20;
@@ -50,7 +53,7 @@ export function createOpenCliRunner(entry = process.env.XHS_MONITOR_OPENCLI_ENTR
         maxBuffer: OUTPUT_LIMIT,
         windowsHide: true,
         encoding: 'utf8',
-        cwd: fileURLToPath(new URL('.', import.meta.url)),
+        cwd: childWorkingDirectory,
         env: { ...process.env, OPENCLI_BROWSER_CONNECT_TIMEOUT: '8', OPENCLI_BROWSER_COMMAND_TIMEOUT: '22' },
       });
       stdout = result.stdout;

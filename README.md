@@ -21,6 +21,8 @@
 
 ## 开发、检查和打包
 
+开发和打包使用 Node.js 22.12+ 或 24+ 的 LTS 版本。
+
 ```powershell
 npm ci
 npm run dev
@@ -30,14 +32,26 @@ npm run dev
 npm run typecheck
 npm test
 npm run build
-npm run dist
 ```
 
 - `dev`：启动带开发热更新的 Electron 应用。
 - `typecheck`：严格 TypeScript 检查。
 - `test`：运行采集、历史存储、IPC 和 React 组件测试；测试使用替身，不访问真实小红书。
 - `build`：生成 `out/` 下的主进程、preload 和渲染进程产物。
-- `dist`：通过 electron-builder 生成 Windows NSIS 安装包。
+
+在 Windows 上，从项目根目录运行打包脚本：
+
+```powershell
+.\scripts\package-windows.cmd
+```
+
+脚本按锁文件安装依赖、构建应用并生成 `dist/` 下的 NSIS `.exe` 安装包。依赖已安装时，可以直接运行：
+
+```powershell
+npm run dist
+```
+
+安装后，采集功能仍需按「准备运行环境」配置 Node.js 和浏览器扩展。
 
 ## 数据与安全
 
