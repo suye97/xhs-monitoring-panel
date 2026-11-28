@@ -1,5 +1,6 @@
 import type {
   CaptureResult,
+  CommentItem,
   CommentStats,
   MetricName,
   Note,
@@ -14,7 +15,8 @@ const POSITIVE = /满意|推荐|喜欢|惊喜|好用|好喝|好吃|值得|回购
 
 export type MonitorErrorCode = 'invalidKeyword' | 'invalidSource' | 'collectorUnavailable' | 'collectorBridge'
   | 'collectorLogin' | 'collectorBlocked' | 'collectorBusy' | 'collectorFailed' | 'collectorFormat'
-  | 'collectorNoteLink' | 'timeout' | 'searchFailed';
+  | 'collectorNoteLink' | 'timeout' | 'aiFilterUnavailable' | 'aiFilterFailed' | 'aiFilterTimeout'
+  | 'aiFilterFormat' | 'searchFailed';
 
 export class MonitorError extends Error {
   constructor(readonly code: MonitorErrorCode) {
@@ -121,8 +123,14 @@ function analyzeCommentScans(notes: Note[]): CommentStats {
 
 export type Collector = (keyword: string, signal?: AbortSignal) => Promise<{ notes: Note[]; limited: boolean }>;
 
-export function createMonitor({ collector, now = () => new Date() }: {
+export interface ValidityFilter {
+  isNoteValid(note: Pick<Note, 'title' | 'text'>, signal?: AbortSignal): Promise<boolean>;
+  filterComments(items: CommentItem[], signal?: AbortSignal): Promise<CommentItem[]>;
+}
+
+export function createMonitor({ collector, validityFilter, now = () => new Date() }: {
   collector: Collector;
+  validityFilter: ValidityFilter;
   now?: () => Date;
 }) {
   return async function search(input: { keyword?: unknown; source?: unknown }, parentSignal?: AbortSignal): Promise<CaptureResult> {
@@ -131,8 +139,17 @@ export function createMonitor({ collector, now = () => new Date() }: {
     if (input.source !== 'opencli') throw new MonitorError('invalidSource');
     if (!collector) throw new MonitorError('collectorUnavailable');
     const { notes, limited } = await collector(keyword, parentSignal);
-    for (const note of notes) Object.assign(note, classify(note.title, note.text));
-    const comments = analyzeCommentScans(notes);
-    return { keyword, source: 'opencli', capturedAt: now().toISOString(), limited, stats: summarize(notes), comments, notes };
+    const validNotes: Note[] = [];
+    for (const note of notes) {
+      parentSignal?.throwIfAborted();
+      if (!await validityFilter.isNoteValid(note, parentSignal)) continue;
+      if (note.commentScan?.status === 'sampled' && note.commentScan.items.length) {
+        note.commentScan.items = await validityFilter.filterComments(note.commentScan.items, parentSignal);
+      }
+      Object.assign(note, classify(note.title, note.text));
+      validNotes.push(note);
+    }
+    const comments = analyzeCommentScans(validNotes);
+    return { keyword, source: 'opencli', capturedAt: now().toISOString(), limited, stats: summarize(validNotes), comments, notes: validNotes };
   };
 }

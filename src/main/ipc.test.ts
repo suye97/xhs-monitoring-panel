@@ -43,6 +43,10 @@ describe('desktop IPC', () => {
     const failed = setup({ search: vi.fn(async () => { throw new MonitorError('collectorBridge'); }) });
     expect(await failed.handlers.get(IPC_CHANNELS.search)!(failed.event, '茶')).toEqual({ ok: false, error: 'collectorBridge' });
     expect(failed.runtime.add).not.toHaveBeenCalled();
+    const invalidModelResponse = setup({ search: vi.fn(async () => { throw new MonitorError('aiFilterFormat'); }) });
+    expect(await invalidModelResponse.handlers.get(IPC_CHANNELS.search)!(invalidModelResponse.event, '茶'))
+      .toEqual({ ok: false, error: 'aiFilterFormat' });
+    expect(invalidModelResponse.runtime.add).not.toHaveBeenCalled();
     let finish: (() => void) | undefined;
     const active = setup({ search: vi.fn(() => new Promise(resolve => { finish = () => resolve(captureFixture()); })) });
     const first = active.handlers.get(IPC_CHANNELS.search)!(active.event, '茶');

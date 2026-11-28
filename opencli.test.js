@@ -9,6 +9,10 @@ import { createMonitor, MonitorError } from './src/main/monitor.ts';
 const first = 'https://www.xiaohongshu.com/search_result/0123456789abcdef01234567?xsec_token=a&xsec_source=pc_search';
 const second = 'https://www.xiaohongshu.com/explore/aaaaaaaaaaaaaaaaaaaaaaaa?xsec_token=b';
 const third = 'https://www.xiaohongshu.com/explore/bbbbbbbbbbbbbbbbbbbbbbbb?xsec_token=c';
+const acceptAll = {
+  isNoteValid: async () => true,
+  filterComments: async items => items,
+};
 
 it('uses OpenCLI envelopes and keeps keyword input in a single positional argument', async context => {
   const dir = await mkdtemp(join(tmpdir(), 'xhs-monitor-test-'));
@@ -37,7 +41,7 @@ it('keeps a successful comment sample when another note is blocked and later not
     if (value === first) return [{ text: '踩雷' }, { text: '喜欢', is_reply: true }, { text: ' ' }];
     throw new MonitorError('collectorBlocked');
   });
-  const result = await createMonitor({ collector })({ keyword: '咖啡', source: 'opencli' });
+  const result = await createMonitor({ collector, validityFilter: acceptAll })({ keyword: '咖啡', source: 'opencli' });
   assert.deepEqual(calls.map(([verb]) => verb), ['search', 'comments', 'note', 'comments']);
   assert.equal(result.stats.count, 3);
   assert.equal(result.stats.negativeRatio, 0);
@@ -51,7 +55,7 @@ it('keeps a successful comment sample when another note is blocked and later not
 
 it('distinguishes successful empty comments and link skips from a measured zero percent', async () => {
   const collect = createOpenCliCollector(async verb => verb === 'search' ? [{ url: first }, { url: second.split('?')[0] }] : []);
-  const result = await createMonitor({ collector: collect })({ keyword: '茶', source: 'opencli' });
+  const result = await createMonitor({ collector: collect, validityFilter: acceptAll })({ keyword: '茶', source: 'opencli' });
   assert.equal(result.comments.negativeRatio, null);
   assert.equal(result.comments.sampledNotes, 1);
   assert.equal(result.notes[1].commentScan.reason, 'collectorNoteLink');

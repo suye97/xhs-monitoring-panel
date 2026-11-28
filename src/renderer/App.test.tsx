@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
@@ -68,5 +69,17 @@ describe('monitor desktop UI', () => {
     fireEvent.click(screen.getByRole('button', { name: '搜索笔记并扫描评论' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Browser Bridge');
     expect(screen.getByText('完成一次采集后，记录会显示在这里。')).toBeInTheDocument();
+  });
+
+  it('explains missing JEV configuration instead of displaying unfiltered data', async () => {
+    const api = apiFixture({
+      listHistory: vi.fn(async () => []),
+      search: vi.fn(async () => ({ ok: false as const, error: 'aiFilterUnavailable' as const })),
+    });
+    render(<App api={api} />);
+    fireEvent.change(screen.getByLabelText('关键词'), { target: { value: '咖啡' } });
+    fireEvent.click(screen.getByRole('button', { name: '搜索笔记并扫描评论' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('OpenRouter API Key');
+    expect(screen.queryByText('历史笔记标题')).not.toBeInTheDocument();
   });
 });

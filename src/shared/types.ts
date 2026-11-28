@@ -89,6 +89,10 @@ export type ErrorCode =
   | 'collectorFormat'
   | 'collectorNoteLink'
   | 'timeout'
+  | 'aiFilterUnavailable'
+  | 'aiFilterFailed'
+  | 'aiFilterTimeout'
+  | 'aiFilterFormat'
   | 'scanCanceled'
   | 'searchFailed';
 

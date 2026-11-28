@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HistoryStore } from './history';
 import { registerIpcHandlers } from './ipc';
+import { createJevFilter } from './jev';
 import { createMonitor } from './monitor';
 import { createOpenCliCollector } from './opencli';
 
@@ -35,7 +36,7 @@ export function createMainWindow(): BrowserWindow {
 
 app.whenReady().then(() => {
   const history = new HistoryStore(join(app.getPath('userData'), 'capture-history.json'));
-  const search = createMonitor({ collector: createOpenCliCollector() });
+  const search = createMonitor({ collector: createOpenCliCollector(), validityFilter: createJevFilter() });
   registerIpcHandlers(ipcMain, {
     search,
     add: result => history.add(result),

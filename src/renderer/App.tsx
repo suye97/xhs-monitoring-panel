@@ -17,7 +17,8 @@ const sentiments: Sentiment[] = ['negative', 'positive', 'neutral', 'mixed', 'un
 const errorCodes = new Set<ErrorCode>([
   'invalidKeyword', 'invalidSource', 'collectorUnavailable', 'collectorBridge', 'collectorLogin',
   'collectorBlocked', 'collectorBusy', 'collectorFailed', 'collectorFormat', 'collectorNoteLink',
-  'timeout', 'scanCanceled', 'searchFailed',
+  'timeout', 'aiFilterUnavailable', 'aiFilterFailed', 'aiFilterTimeout', 'aiFilterFormat',
+  'scanCanceled', 'searchFailed',
 ]);
 
 function errorTranslation(t: Translate, value: string | undefined): string {
